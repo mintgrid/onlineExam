@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}{{ exam.title }} - Online Exam{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="timer-card">
+        <div class="timer-display" id="timer">00:00</div>
+        <div class="timer-label">Time Remaining</div>
+        <div style="margin-top: 1rem;">
+            <button onclick="submitExam()" class="btn btn-danger" style="width: 100%;">
+                <i class="fas fa-paper-plane"></i> Submit Exam
+            </button>
+        </div>
+    </div>
+
+    <div class="dashboard-header">
+        <h1 style="font-size: 2rem; font-weight: 700; color: #1f2937; margin-bottom: 0.5rem;">
+            <i class="fas fa-file-alt"></i> {{ exam.title }}
+        </h1>
+        {% if exam.description %}
+        <p style="color: #6b7280;">{{ exam.description }}</p>
+        {% endif %}
+        <div style="margin-top: 1rem; display: flex; gap: 2rem;">
+            <span class="badge badge-primary" style="padding: 0.5rem 1rem;">
+                <i class="fas fa-question-circle"></i> {{ questions|length }} Questions
+            </span>
+            <span class="badge badge-warning" style="padding: 0.5rem 1rem;">
+                <i class="fas fa-star"></i> Total Marks: {{ questions|sum(attribute='marks') }}
+            </span>
+        </div>
+    </div>
+
+    <form id="examForm" method="POST" action="{{ url_for('submit_exam', exam_id=exam.id) }}">
+        {% for question in questions %}
+        <div class="question-card">
+            <div style="display: flex; align-items: start; gap: 1rem;">
+                <span class="question-number">{{ loop.index }}</span>
+                <div style="flex: 1;">
+                    <p style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; color: #1f2937;">
+                        {{ question.question_text }}
+                    </p>
+                    <div class="radio-group">
+                        <label class="radio-option">
+                            <input type="radio" name="question_{{ question.id }}" value="A">
+                            <span><strong>A.</strong> {{ question.option_a }}</span>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="question_{{ question.id }}" value="B">
+                            <span><strong>B.</strong> {{ question.option_b }}</span>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="question_{{ question.id }}" value="C">
+                            <span><strong>C.</strong> {{ question.option_c }}</span>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="question_{{ question.id }}" value="D">
+                            <span><strong>D.</strong> {{ question.option_d }}</span>
+                        </label>
+                    </div>
+                </div>
+                <span class="badge badge-primary">{{ question.marks }} mark{{ 's' if question.marks > 1 else '' }}</span>
+            </div>
+        </div>
+        {% endfor %}
+
+        <div style="margin-top: 2rem; padding: 2rem; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 16px;">
+            <p style="color: #92400e; margin-bottom: 1rem;">
+                <i class="fas fa-exclamation-triangle"></i> <strong>Before submitting:</strong>
+            </p>
+            <ul style="color: #92400e; margin-left: 1.5rem;">
+                <li>Make sure you have answered all questions</li>
+                <li>Review your answers carefully</li>
+                <li>Once submitted, you cannot modify your answers</li>
+            </ul>
+            <button type="button" onclick="submitExam()" class="btn btn-danger" style="margin-top: 1rem;">
+                <i class="fas fa-paper-plane"></i> Submit Exam
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+    let timeRemaining = {{ time_remaining }};
+    const timerElement = document.getElementById('timer');
+    
+    function updateTimer() {
+        if (timeRemaining <= 0) {
+            submitExam();
+            return;
+        }
+        
+        const hours = Math.floor(timeRemaining / 3600);
+        const minutes = Math.floor((timeRemaining % 3600) / 60);
+        const seconds = timeRemaining % 60;
+        
+        let display = '';
+        if (hours > 0) {
+            display = `${hours.toString().padStart(2, '0')}:`;
+        }
+        display += `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        
+        timerElement.textContent = display;
+        
+        if (timeRemaining <= 300) {
+            timerElement.style.color = '#ef4444';
+        } else if (timeRemaining <= 600) {
+            timerElement.style.color = '#f59e0b';
+        }
+        
+        timeRemaining--;
+    }
+    
+    function submitExam() {
+        if (confirm('Are you sure you want to submit your exam? You cannot change your answers after submission.')) {
+            document.getElementById('examForm').submit();
+        }
+    }
+    
+    setInterval(updateTimer, 1000);
+    updateTimer();
+    
+    window.addEventListener('beforeunload', function (e) {
+        e.preventDefault();
+        e.returnValue = '';
+    });
+</script>
+{% endblock %}

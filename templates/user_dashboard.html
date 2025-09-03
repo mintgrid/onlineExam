@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}Student Dashboard - Online Exam Portal{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1 style="font-size: 2rem; font-weight: 700; color: #1f2937; margin-bottom: 0.5rem;">
+            <i class="fas fa-graduation-cap"></i> Student Dashboard
+        </h1>
+        <p style="color: #6b7280;">Welcome back, {{ current_user.username }}!</p>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card glass-morphism">
+            <div class="stat-value">{{ available_exams|length }}</div>
+            <div class="stat-label">Available Exams</div>
+        </div>
+        <div class="stat-card glass-morphism">
+            <div class="stat-value">{{ completed_exams|length }}</div>
+            <div class="stat-label">Completed Exams</div>
+        </div>
+        <div class="stat-card glass-morphism">
+            <div class="stat-value">
+                {% if completed_exams %}
+                    {% set total_score = namespace(value=0) %}
+                    {% set total_marks = namespace(value=0) %}
+                    {% for perm in completed_exams %}
+                        {% for result in perm.exam.results %}
+                            {% if result.user_id == current_user.id %}
+                                {% set total_score.value = total_score.value + result.score %}
+                                {% set total_marks.value = total_marks.value + result.total_marks %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endfor %}
+                    {% if total_marks.value > 0 %}
+                        {{ ((total_score.value / total_marks.value) * 100)|round(1) }}%
+                    {% else %}
+                        0%
+                    {% endif %}
+                {% else %}
+                    N/A
+                {% endif %}
+            </div>
+            <div class="stat-label">Average Score</div>
+        </div>
+    </div>
+
+    <div class="card glass-morphism">
+        <h2 class="card-title">
+            <i class="fas fa-clock"></i> Available Exams
+        </h2>
+        {% if available_exams %}
+        <div style="display: grid; gap: 1rem;">
+            {% for permission in available_exams %}
+            <div class="question-card" style="border-left: 4px solid #10b981;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <h3 style="margin-bottom: 0.5rem; color: #1f2937;">{{ permission.exam.title }}</h3>
+                        <p style="color: #6b7280; margin-bottom: 0.5rem;">
+                            <i class="fas fa-clock"></i> Duration: {{ permission.exam.duration_minutes }} minutes
+                        </p>
+                        <p style="color: #6b7280; margin-bottom: 0.5rem;">
+                            <i class="fas fa-question-circle"></i> Questions: {{ permission.exam.questions|length }}
+                        </p>
+                        <p style="color: #6b7280;">
+                            <i class="fas fa-calendar"></i> Available until: {{ permission.end_time.strftime('%Y-%m-%d %H:%M') }}
+                        </p>
+                    </div>
+                    <a href="{{ url_for('take_exam', exam_id=permission.exam.id) }}" class="btn btn-primary">
+                        <i class="fas fa-play"></i> Start Exam
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">
+                <i class="fas fa-clipboard-list"></i>
+            </div>
+            <p class="empty-state-text">No exams available at this time</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="card glass-morphism">
+        <h2 class="card-title">
+            <i class="fas fa-check-circle"></i> Completed Exams
+        </h2>
+        {% if completed_exams %}
+        <div class="table-responsive">
+            <table class="modern-table">
+                <thead>
+                    <tr>
+                        <th>Exam Title</th>
+                        <th>Completed Date</th>
+                        <th>Score</th>
+                        <th>Percentage</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for permission in completed_exams %}
+                        {% for result in permission.exam.results %}
+                            {% if result.user_id == current_user.id %}
+                            <tr>
+                                <td><strong>{{ permission.exam.title }}</strong></td>
+                                <td>{{ result.submitted_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>{{ result.score }}/{{ result.total_marks }}</td>
+                                <td>
+                                    <span class="badge {% if result.percentage >= 80 %}badge-success{% elif result.percentage >= 60 %}badge-warning{% else %}badge-danger{% endif %}">
+                                        {{ result.percentage|round(2) }}%
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if result.percentage >= 40 %}
+                                        <span class="badge badge-success">Passed</span>
+                                    {% else %}
+                                        <span class="badge badge-danger">Failed</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endif %}
+                        {% endfor %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">
+                <i class="fas fa-trophy"></i>
+            </div>
+            <p class="empty-state-text">No completed exams yet</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

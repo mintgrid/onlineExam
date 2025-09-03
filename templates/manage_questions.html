@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Questions - {{ exam.title }}{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1 style="font-size: 2rem; font-weight: 700; color: #1f2937; margin-bottom: 0.5rem;">
+            <i class="fas fa-question-circle"></i> Manage Questions
+        </h1>
+        <p style="color: #6b7280;">{{ exam.title }} - {{ exam.duration_minutes }} minutes</p>
+    </div>
+
+    <div class="card glass-morphism">
+        <h2 class="card-title">
+            <i class="fas fa-plus-circle"></i> Add New Question
+        </h2>
+        <form method="POST" action="{{ url_for('manage_questions', exam_id=exam.id) }}">
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-question"></i> Question Text
+                </label>
+                <textarea name="question_text" class="form-control" rows="3" placeholder="Enter your question here..." required></textarea>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Option A</label>
+                    <input type="text" name="option_a" class="form-control" placeholder="Enter option A" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Option B</label>
+                    <input type="text" name="option_b" class="form-control" placeholder="Enter option B" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Option C</label>
+                    <input type="text" name="option_c" class="form-control" placeholder="Enter option C" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Option D</label>
+                    <input type="text" name="option_d" class="form-control" placeholder="Enter option D" required>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">
+                        <i class="fas fa-check-circle"></i> Correct Answer
+                    </label>
+                    <select name="correct_answer" class="form-control" required>
+                        <option value="">Select correct option</option>
+                        <option value="A">Option A</option>
+                        <option value="B">Option B</option>
+                        <option value="C">Option C</option>
+                        <option value="D">Option D</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">
+                        <i class="fas fa-star"></i> Marks
+                    </label>
+                    <input type="number" name="marks" class="form-control" value="1" min="1" max="10" required>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Add Question
+            </button>
+        </form>
+    </div>
+
+    <div class="card glass-morphism">
+        <h2 class="card-title">
+            <i class="fas fa-list"></i> Current Questions ({{ questions|length }})
+        </h2>
+        {% if questions %}
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+            {% for question in questions %}
+            <div class="question-card">
+                <div style="display: flex; justify-content: space-between; align-items: start;">
+                    <div style="flex: 1;">
+                        <div style="display: flex; align-items: center; margin-bottom: 1rem;">
+                            <span class="question-number">{{ loop.index }}</span>
+                            <strong>{{ question.question_text }}</strong>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-left: 48px;">
+                            <div style="padding: 0.5rem; background: {% if question.correct_answer == 'A' %}linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%){% else %}#f9fafb{% endif %}; border-radius: 8px;">
+                                <strong>A:</strong> {{ question.option_a }}
+                            </div>
+                            <div style="padding: 0.5rem; background: {% if question.correct_answer == 'B' %}linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%){% else %}#f9fafb{% endif %}; border-radius: 8px;">
+                                <strong>B:</strong> {{ question.option_b }}
+                            </div>
+                            <div style="padding: 0.5rem; background: {% if question.correct_answer == 'C' %}linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%){% else %}#f9fafb{% endif %}; border-radius: 8px;">
+                                <strong>C:</strong> {{ question.option_c }}
+                            </div>
+                            <div style="padding: 0.5rem; background: {% if question.correct_answer == 'D' %}linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%){% else %}#f9fafb{% endif %}; border-radius: 8px;">
+                                <strong>D:</strong> {{ question.option_d }}
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <span class="badge badge-primary">{{ question.marks }} marks</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">
+                <i class="fas fa-question"></i>
+            </div>
+            <p class="empty-state-text">No questions added yet</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div style="margin-top: 2rem;">
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+</div>
+{% endblock %}
