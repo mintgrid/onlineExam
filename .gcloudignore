@@ -1,0 +1,49 @@
+# This file specifies files that are *not* uploaded to Google Cloud
+# using gcloud. It follows the same syntax as .gitignore, with the addition of
+# "#!include" directives (which insert the entries of the given .gitignore-style
+# file at that point).
+
+.gcloudignore
+.git
+.gitignore
+
+# Python pycache:
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+ENV/
+.venv
+
+# Instance folder
+instance/
+*.db
+
+# IDE
+.vscode/
+.idea/
+
+# Testing and logs
+*.log
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation
+README.md
+CLAUDE.md
+
+# Development files
+create_sample_data.py
+sample_test.py
+
+# Environment files (we'll use App Engine env_variables instead)
+.env
+.env.example

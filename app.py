@@ -76,6 +76,12 @@ class ExamResult(db.Model):
     submitted_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     answers = db.Column(db.Text)
 
+class Settings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(100), unique=True, nullable=False)
+    value = db.Column(db.Text)
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
@@ -85,8 +91,47 @@ def generate_password():
     password = ''.join(secrets.choice(characters) for _ in range(10))
     return password
 
+def get_setting(key, default=None):
+    """Get a setting value from the database"""
+    setting = Settings.query.filter_by(key=key).first()
+    return setting.value if setting else default
+
+def set_setting(key, value):
+    """Set a setting value in the database"""
+    setting = Settings.query.filter_by(key=key).first()
+    if setting:
+        setting.value = value
+        setting.updated_at = datetime.now(timezone.utc)
+    else:
+        setting = Settings(key=key, value=value)
+        db.session.add(setting)
+    db.session.commit()
+
+def update_mail_config():
+    """Update Flask-Mail configuration from database settings"""
+    mail_username = get_setting('MAIL_USERNAME', app.config.get('MAIL_USERNAME'))
+    mail_password = get_setting('MAIL_PASSWORD', app.config.get('MAIL_PASSWORD'))
+    mail_server = get_setting('MAIL_SERVER', app.config.get('MAIL_SERVER', 'smtp.gmail.com'))
+    mail_port = int(get_setting('MAIL_PORT', app.config.get('MAIL_PORT', 587)))
+    mail_use_tls = get_setting('MAIL_USE_TLS', 'true').lower() == 'true'
+    mail_default_sender = get_setting('MAIL_DEFAULT_SENDER', app.config.get('MAIL_DEFAULT_SENDER'))
+    
+    # Update app config
+    app.config['MAIL_USERNAME'] = mail_username
+    app.config['MAIL_PASSWORD'] = mail_password
+    app.config['MAIL_SERVER'] = mail_server
+    app.config['MAIL_PORT'] = mail_port
+    app.config['MAIL_USE_TLS'] = mail_use_tls
+    app.config['MAIL_DEFAULT_SENDER'] = mail_default_sender
+    
+    # Reinitialize mail instance
+    mail.init_app(app)
+
 def send_user_credentials(email, username, password):
     try:
+        # Update mail configuration from database settings
+        update_mail_config()
+        
         msg = Message('Your Exam Portal Login Credentials',
                       recipients=[email])
         msg.html = f'''
@@ -109,6 +154,9 @@ def send_user_credentials(email, username, password):
 
 def send_exam_completion_notification(admin_email, user_name, exam_title, score, total):
     try:
+        # Update mail configuration from database settings
+        update_mail_config()
+        
         msg = Message('Exam Completed Notification',
                       recipients=[admin_email])
         percentage = (score / total * 100) if total > 0 else 0
@@ -157,6 +205,22 @@ def login():
 def logout():
     logout_user()
     return redirect(url_for('index'))
+
+@app.route('/health')
+def health_check():
+    """Health check endpoint for Google Cloud monitoring"""
+    try:
+        # Check database connectivity
+        db.session.execute(db.select(db.text('1')))
+        db_status = 'healthy'
+    except Exception as e:
+        db_status = f'unhealthy: {str(e)}'
+    
+    return jsonify({
+        'status': 'healthy' if db_status == 'healthy' else 'degraded',
+        'database': db_status,
+        'timestamp': datetime.now(timezone.utc).isoformat()
+    }), 200 if db_status == 'healthy' else 503
 
 @app.route('/admin/dashboard')
 @login_required
@@ -256,6 +320,95 @@ def manage_questions(exam_id):
     
     questions = Question.query.filter_by(exam_id=exam_id).all()
     return render_template('manage_questions.html', exam=exam, questions=questions)
+
+@app.route('/admin/exam/<int:exam_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_exam(exam_id):
+    if not current_user.is_admin:
+        flash('Access denied', 'error')
+        return redirect(url_for('index'))
+    
+    exam = Exam.query.get_or_404(exam_id)
+    
+    # Check if this exam belongs to the current admin
+    if exam.created_by != current_user.id:
+        flash('You can only edit your own exams', 'error')
+        return redirect(url_for('admin_dashboard'))
+    
+    if request.method == 'POST':
+        exam.title = request.form.get('title')
+        exam.description = request.form.get('description')
+        exam.duration_minutes = int(request.form.get('duration_minutes'))
+        
+        db.session.commit()
+        flash('Exam updated successfully', 'success')
+        return redirect(url_for('admin_dashboard'))
+    
+    return render_template('edit_exam.html', exam=exam)
+
+@app.route('/admin/exam/<int:exam_id>/delete', methods=['POST'])
+@login_required
+def delete_exam(exam_id):
+    if not current_user.is_admin:
+        return jsonify({'error': 'Access denied'}), 403
+    
+    exam = Exam.query.get_or_404(exam_id)
+    
+    if exam.created_by != current_user.id:
+        return jsonify({'error': 'You can only delete your own exams'}), 403
+    
+    db.session.delete(exam)
+    db.session.commit()
+    
+    return jsonify({'message': 'Exam deleted successfully'}), 200
+
+@app.route('/admin/question/<int:question_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_question(question_id):
+    if not current_user.is_admin:
+        flash('Access denied', 'error')
+        return redirect(url_for('index'))
+    
+    question = Question.query.get_or_404(question_id)
+    exam = Exam.query.get(question.exam_id)
+    
+    # Check if this exam belongs to the current admin
+    if exam.created_by != current_user.id:
+        flash('You can only edit questions from your own exams', 'error')
+        return redirect(url_for('admin_dashboard'))
+    
+    if request.method == 'POST':
+        question.question_text = request.form.get('question_text')
+        question.option_a = request.form.get('option_a')
+        question.option_b = request.form.get('option_b')
+        question.option_c = request.form.get('option_c')
+        question.option_d = request.form.get('option_d')
+        question.correct_answer = request.form.get('correct_answer')
+        question.marks = int(request.form.get('marks', 1))
+        
+        db.session.commit()
+        flash('Question updated successfully', 'success')
+        return redirect(url_for('manage_questions', exam_id=question.exam_id))
+    
+    return render_template('edit_question.html', question=question, exam=exam)
+
+@app.route('/admin/question/<int:question_id>/delete', methods=['POST'])
+@login_required
+def delete_question(question_id):
+    if not current_user.is_admin:
+        return jsonify({'error': 'Access denied'}), 403
+    
+    question = Question.query.get_or_404(question_id)
+    exam = Exam.query.get(question.exam_id)
+    
+    if exam.created_by != current_user.id:
+        return jsonify({'error': 'You can only delete questions from your own exams'}), 403
+    
+    exam_id = question.exam_id
+    db.session.delete(question)
+    db.session.commit()
+    
+    return jsonify({'message': 'Question deleted successfully', 'exam_id': exam_id}), 200
 
 @app.route('/admin/assign_exam', methods=['GET', 'POST'])
 @login_required
@@ -510,6 +663,113 @@ def view_results():
     results = ExamResult.query.filter(ExamResult.exam_id.in_(exam_ids)).all()
     
     return render_template('view_results.html', results=results)
+
+@app.route('/admin/change_password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    # Admin only feature
+    if not current_user.is_admin:
+        flash('Access denied', 'error')
+        return redirect(url_for('user_dashboard'))
+    
+    if request.method == 'POST':
+        current_password = request.form.get('current_password')
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+        
+        # Validate current password
+        if not check_password_hash(current_user.password_hash, current_password):
+            flash('Current password is incorrect', 'error')
+            return redirect(url_for('change_password'))
+        
+        # Validate new password
+        if not new_password or len(new_password) < 6:
+            flash('New password must be at least 6 characters long', 'error')
+            return redirect(url_for('change_password'))
+        
+        # Check if passwords match
+        if new_password != confirm_password:
+            flash('New passwords do not match', 'error')
+            return redirect(url_for('change_password'))
+        
+        # Check if new password is different from current
+        if check_password_hash(current_user.password_hash, new_password):
+            flash('New password must be different from current password', 'error')
+            return redirect(url_for('change_password'))
+        
+        # Update password
+        current_user.password_hash = generate_password_hash(new_password)
+        db.session.commit()
+        
+        flash('Password changed successfully!', 'success')
+        return redirect(url_for('admin_dashboard'))
+    
+    return render_template('change_password.html')
+
+@app.route('/admin/notification_settings', methods=['GET', 'POST'])
+@login_required
+def notification_settings():
+    # Admin only feature
+    if not current_user.is_admin:
+        flash('Access denied', 'error')
+        return redirect(url_for('user_dashboard'))
+    
+    if request.method == 'POST':
+        # Get form data
+        mail_server = request.form.get('mail_server', 'smtp.gmail.com')
+        mail_port = request.form.get('mail_port', '587')
+        mail_username = request.form.get('mail_username', '')
+        mail_password = request.form.get('mail_password', '')
+        mail_use_tls = 'mail_use_tls' in request.form
+        mail_default_sender = request.form.get('mail_default_sender', '')
+        
+        # Validate required fields
+        if not mail_username:
+            flash('Email username is required', 'error')
+            return redirect(url_for('notification_settings'))
+        
+        if not mail_password:
+            flash('Email password is required', 'error')
+            return redirect(url_for('notification_settings'))
+        
+        # Validate port
+        try:
+            port_num = int(mail_port)
+            if port_num < 1 or port_num > 65535:
+                raise ValueError()
+        except ValueError:
+            flash('Invalid port number', 'error')
+            return redirect(url_for('notification_settings'))
+        
+        # Save settings to database
+        try:
+            set_setting('MAIL_SERVER', mail_server)
+            set_setting('MAIL_PORT', mail_port)
+            set_setting('MAIL_USERNAME', mail_username)
+            set_setting('MAIL_PASSWORD', mail_password)
+            set_setting('MAIL_USE_TLS', 'true' if mail_use_tls else 'false')
+            set_setting('MAIL_DEFAULT_SENDER', mail_default_sender or mail_username)
+            
+            # Update mail configuration
+            update_mail_config()
+            
+            flash('Notification settings updated successfully!', 'success')
+        except Exception as e:
+            flash(f'Error saving settings: {str(e)}', 'error')
+        
+        return redirect(url_for('notification_settings'))
+    
+    # Get current settings for display
+    current_settings = {
+        'mail_server': get_setting('MAIL_SERVER', app.config.get('MAIL_SERVER', 'smtp.gmail.com')),
+        'mail_port': get_setting('MAIL_PORT', app.config.get('MAIL_PORT', '587')),
+        'mail_username': get_setting('MAIL_USERNAME', app.config.get('MAIL_USERNAME', '')),
+        'mail_password': get_setting('MAIL_PASSWORD', app.config.get('MAIL_PASSWORD', '')),
+        'mail_use_tls': get_setting('MAIL_USE_TLS', 'true').lower() == 'true',
+        'mail_default_sender': get_setting('MAIL_DEFAULT_SENDER', app.config.get('MAIL_DEFAULT_SENDER', ''))
+    }
+    
+    return render_template('notification_settings.html', settings=current_settings)
 
 @app.route('/create_test_users')
 def create_test_users():
