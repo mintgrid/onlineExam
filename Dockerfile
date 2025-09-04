@@ -21,8 +21,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create instance directory for SQLite database
+# Create instance directory (legacy - now using Firebase)
 RUN mkdir -p instance
+
+# Set Firebase environment for production
+ENV GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-service-account.json
+
+# Make start script executable
+RUN chmod +x start.sh
 
 # Create non-root user
 RUN useradd -m -u 1001 appuser && chown -R appuser:appuser /app
@@ -35,5 +41,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD python -c "import requests; requests.get('http://localhost:8080/health')" || exit 1
 
-# Run the application with gunicorn for production
-CMD exec gunicorn --bind :$PORT --workers 2 --threads 8 --timeout 0 app:app
+# Run the application with startup script
+CMD ["./start.sh"]

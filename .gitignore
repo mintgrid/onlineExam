@@ -16,10 +16,16 @@ instance/
 *.log
 flask_*.log
 
-# Database
+# Database (Legacy SQLite - now using Firebase)
 *.db
 *.sqlite
 *.sqlite3
+app_sqlite.py.backup
+
+# Firebase
+firebase-service-account.json
+firebase-debug.log
+.firebase/
 
 # IDE
 .vscode/
