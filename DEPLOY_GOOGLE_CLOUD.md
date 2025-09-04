@@ -79,11 +79,21 @@ gcloud run deploy online-exam \
 
 ## Database Setup (Production)
 
-### ⚠️ Important Note for Cloud Run
-The application now **automatically initializes** the database on startup. For Cloud Run deployments:
-- SQLite databases are ephemeral (reset on container restart)
-- For persistent data, use Cloud SQL (recommended for production)
+### 🔥 Firebase Integration
+The application now uses **Firebase/Firestore** for persistent cloud storage:
+- ✅ **Persistent data** - No more data loss on container restarts
+- ✅ **Real-time updates** - Live exam monitoring
+- ✅ **Auto-scaling** - Handles traffic spikes
+- ✅ **Global distribution** - Fast access worldwide
 - Default admin users are created automatically: `admin/admin123` and `admin2/admin456`
+
+### Firebase Setup Required:
+1. **Service Account**: Set `FIREBASE_SERVICE_ACCOUNT` environment variable
+2. **Firestore Database**: Enable in Firebase Console
+3. **Security Rules**: Configure Firestore access rules
+4. **Project ID**: `onlineexam-f01cd`
+
+See `FIREBASE_SETUP.md` for detailed instructions.
 
 ### Option A: Use Cloud SQL (Recommended for production)
 

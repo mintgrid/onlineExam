@@ -21,8 +21,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create instance directory for SQLite database
+# Create instance directory (legacy - now using Firebase)
 RUN mkdir -p instance
+
+# Set Firebase environment for production
+ENV GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-service-account.json
 
 # Make start script executable
 RUN chmod +x start.sh
