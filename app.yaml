@@ -1,0 +1,32 @@
+# Google App Engine configuration file
+runtime: python311
+
+# Instance configuration
+instance_class: F2
+automatic_scaling:
+  min_instances: 1
+  max_instances: 10
+  target_cpu_utilization: 0.65
+  target_throughput_utilization: 0.7
+
+# Environment variables
+env_variables:
+  FLASK_ENV: "production"
+  SECRET_KEY: "your-production-secret-key-change-this"  # Change this in production
+
+# Handlers for static files
+handlers:
+- url: /static
+  static_dir: static
+  secure: always
+
+- url: /.*
+  script: auto
+  secure: always
+
+# VPC configuration (optional - uncomment if using VPC)
+# vpc_access_connector:
+#   name: projects/YOUR_PROJECT_ID/locations/YOUR_REGION/connectors/YOUR_CONNECTOR
+
+# Service name (optional - defaults to 'default')
+# service: online-exam-app

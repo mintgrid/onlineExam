@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Exam - Admin Portal{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header" style="margin-bottom: 2rem;">
+        <h1 style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+            <i class="fas fa-edit"></i> Edit Exam
+        </h1>
+        <p style="color: #6b7280;">Update exam details and settings</p>
+    </div>
+
+    <div class="card glass-morphism" style="max-width: 800px; margin: 0 auto;">
+        <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1.5rem;">
+            <h2><i class="fas fa-file-alt"></i> Exam Details</h2>
+        </div>
+        
+        <form method="POST" action="{{ url_for('edit_exam', exam_id=exam.id) }}" style="padding: 2rem;">
+            <div class="form-group">
+                <label for="title">
+                    <i class="fas fa-heading"></i> Exam Title
+                </label>
+                <input type="text" 
+                       class="form-control" 
+                       id="title" 
+                       name="title" 
+                       value="{{ exam.title }}"
+                       required 
+                       placeholder="Enter exam title"
+                       style="padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 8px;">
+            </div>
+            
+            <div class="form-group" style="margin-top: 1.5rem;">
+                <label for="description">
+                    <i class="fas fa-align-left"></i> Description
+                </label>
+                <textarea class="form-control" 
+                          id="description" 
+                          name="description" 
+                          rows="4" 
+                          placeholder="Enter exam description"
+                          style="padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 8px; resize: vertical;">{{ exam.description or '' }}</textarea>
+            </div>
+            
+            <div class="form-group" style="margin-top: 1.5rem;">
+                <label for="duration_minutes">
+                    <i class="fas fa-clock"></i> Duration (Minutes)
+                </label>
+                <input type="number" 
+                       class="form-control" 
+                       id="duration_minutes" 
+                       name="duration_minutes" 
+                       value="{{ exam.duration_minutes }}"
+                       min="1" 
+                       max="300"
+                       required 
+                       placeholder="e.g., 60"
+                       style="padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 8px;">
+                <small class="form-text text-muted">Duration should be between 1 and 300 minutes</small>
+            </div>
+            
+            <div style="margin-top: 2rem; display: flex; gap: 1rem; justify-content: space-between; flex-wrap: wrap;">
+                <div style="display: flex; gap: 1rem;">
+                    <a href="{{ url_for('admin_dashboard') }}" 
+                       class="btn-secondary" 
+                       style="padding: 0.75rem 2rem; text-decoration: none; border-radius: 8px; display: inline-flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    </a>
+                    
+                    <a href="{{ url_for('manage_questions', exam_id=exam.id) }}" 
+                       class="btn-info" 
+                       style="padding: 0.75rem 2rem; text-decoration: none; border-radius: 8px; display: inline-flex; align-items: center; gap: 0.5rem; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
+                        <i class="fas fa-question-circle"></i> Manage Questions ({{ exam.questions|length }})
+                    </a>
+                </div>
+                
+                <div style="display: flex; gap: 1rem;">
+                    <button type="button" 
+                            onclick="deleteExam({{ exam.id }})"
+                            class="btn-danger" 
+                            style="padding: 0.75rem 2rem; border: none; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%); color: white;">
+                        <i class="fas fa-trash"></i> Delete Exam
+                    </button>
+                    
+                    <button type="submit" 
+                            class="btn-primary" 
+                            style="padding: 0.75rem 2rem; border: none; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-save"></i> Update Exam
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div style="margin-top: 2rem; max-width: 800px; margin-left: auto; margin-right: auto;">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}" style="padding: 1rem; border-radius: 8px; 
+                         {% if category == 'error' %}background: #fee; color: #c33; border: 1px solid #fcc;
+                         {% else %}background: #e7f5e7; color: #2d6a2d; border: 1px solid #c3e6c3;{% endif %}">
+                        <i class="fas {% if category == 'error' %}fa-exclamation-circle{% else %}fa-check-circle{% endif %}"></i>
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+</div>
+
+<style>
+    .form-control:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        outline: none;
+    }
+    
+    .btn-primary:hover, .btn-secondary:hover, .btn-info:hover, .btn-danger:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    }
+    
+    .btn-secondary {
+        background: #f5f5f5;
+        color: #333;
+    }
+    
+    .btn-secondary:hover {
+        background: #e0e0e0;
+    }
+    
+    label {
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+    
+    .form-text {
+        color: #666;
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+    }
+</style>
+
+<script>
+    function deleteExam(examId) {
+        if (confirm('Are you sure you want to delete this exam? This action cannot be undone and will delete all questions and assignments associated with this exam.')) {
+            fetch(`/admin/exam/${examId}/delete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.message) {
+                    alert('Exam deleted successfully');
+                    window.location.href = "{{ url_for('admin_dashboard') }}";
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error occurred'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while deleting the exam');
+            });
+        }
+    }
+    
+    // Form validation
+    document.querySelector('form').addEventListener('submit', function(e) {
+        const title = document.getElementById('title').value.trim();
+        const duration = parseInt(document.getElementById('duration_minutes').value);
+        
+        if (!title) {
+            alert('Please enter an exam title');
+            e.preventDefault();
+            return;
+        }
+        
+        if (duration < 1 || duration > 300) {
+            alert('Duration must be between 1 and 300 minutes');
+            e.preventDefault();
+            return;
+        }
+    });
+</script>
+{% endblock %}

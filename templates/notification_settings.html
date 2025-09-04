@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+
+{% block title %}Notification Settings - Admin Portal{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header" style="margin-bottom: 2rem;">
+        <h1 style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+            <i class="fas fa-bell"></i> Notification Settings
+        </h1>
+        <p style="color: #6b7280;">Configure email notification settings for the system</p>
+    </div>
+
+    <div class="card glass-morphism" style="max-width: 800px; margin: 0 auto;">
+        <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1.5rem;">
+            <h2><i class="fas fa-envelope"></i> Email Configuration</h2>
+            <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">Configure SMTP settings for sending notifications</p>
+        </div>
+        
+        <form method="POST" action="{{ url_for('notification_settings') }}" style="padding: 2rem;">
+            <div class="form-group">
+                <label for="mail_server">
+                    <i class="fas fa-server"></i> SMTP Server <span style="color: red;">*</span>
+                </label>
+                <input type="text" 
+                       class="form-control" 
+                       id="mail_server" 
+                       name="mail_server" 
+                       value="{{ settings.mail_server }}"
+                       required 
+                       placeholder="smtp.gmail.com"
+                       style="padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 8px;">
+                <small class="form-text text-muted">Common servers: smtp.gmail.com, smtp.outlook.com, smtp.yahoo.com</small>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.5rem;">
+                <div class="form-group">
+                    <label for="mail_port">
+                        <i class="fas fa-plug"></i> SMTP Port <span style="color: red;">*</span>
+                    </label>
+                    <input type="number" 
+                           class="form-control" 
+                           id="mail_port" 
+                           name="mail_port" 
+                           value="{{ settings.mail_port }}"
+                           min="1" 
+                           max="65535"
+                           required 
+                           placeholder="587"
+                           style="padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 8px;">
+                    <small class="form-text text-muted">Common ports: 587 (TLS), 465 (SSL), 25 (Plain)</small>
+                </div>
+                
+                <div class="form-group">
+                    <label style="margin-bottom: 0.5rem;">
+                        <i class="fas fa-shield-alt"></i> Security
+                    </label>
+                    <div style="padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 8px; background: #f9fafb;">
+                        <label style="display: flex; align-items: center; font-weight: normal; cursor: pointer;">
+                            <input type="checkbox" 
+                                   id="mail_use_tls" 
+                                   name="mail_use_tls" 
+                                   {% if settings.mail_use_tls %}checked{% endif %}
+                                   style="margin-right: 0.5rem;">
+                            Use TLS/SSL encryption
+                        </label>
+                    </div>
+                    <small class="form-text text-muted">Recommended for secure email delivery</small>
+                </div>
+            </div>
+            
+            <div class="form-group" style="margin-top: 1.5rem;">
+                <label for="mail_username">
+                    <i class="fas fa-user"></i> Email Username <span style="color: red;">*</span>
+                </label>
+                <input type="email" 
+                       class="form-control" 
+                       id="mail_username" 
+                       name="mail_username" 
+                       value="{{ settings.mail_username }}"
+                       required 
+                       placeholder="your-email@gmail.com"
+                       style="padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 8px;">
+                <small class="form-text text-muted">Your email address for sending notifications</small>
+            </div>
+            
+            <div class="form-group" style="margin-top: 1.5rem;">
+                <label for="mail_password">
+                    <i class="fas fa-lock"></i> Email Password <span style="color: red;">*</span>
+                </label>
+                <input type="password" 
+                       class="form-control" 
+                       id="mail_password" 
+                       name="mail_password" 
+                       value="{{ settings.mail_password }}"
+                       required 
+                       placeholder="Enter your email password or app password"
+                       style="padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 8px;">
+                <small class="form-text text-muted">For Gmail, use an app password instead of your regular password</small>
+            </div>
+            
+            <div class="form-group" style="margin-top: 1.5rem;">
+                <label for="mail_default_sender">
+                    <i class="fas fa-paper-plane"></i> Default Sender Name
+                </label>
+                <input type="text" 
+                       class="form-control" 
+                       id="mail_default_sender" 
+                       name="mail_default_sender" 
+                       value="{{ settings.mail_default_sender }}"
+                       placeholder="Online Exam System"
+                       style="padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 8px;">
+                <small class="form-text text-muted">Name that appears in sent emails (optional)</small>
+            </div>
+            
+            <div style="margin-top: 2rem; padding: 1rem; background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%); border-radius: 8px; border-left: 4px solid #3b82f6;">
+                <h4 style="margin: 0 0 0.5rem 0; color: #1e40af;"><i class="fas fa-info-circle"></i> Gmail Setup Instructions</h4>
+                <ul style="margin: 0; color: #1e40af;">
+                    <li>Enable 2-factor authentication in your Google account</li>
+                    <li>Generate an app password: Google Account → Security → App passwords</li>
+                    <li>Use the generated app password instead of your regular password</li>
+                </ul>
+            </div>
+            
+            <div style="margin-top: 2rem; display: flex; gap: 1rem; justify-content: space-between; flex-wrap: wrap;">
+                <div style="display: flex; gap: 1rem;">
+                    <a href="{{ url_for('admin_dashboard') }}" 
+                       class="btn-secondary" 
+                       style="padding: 0.75rem 2rem; text-decoration: none; border-radius: 8px; display: inline-flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    </a>
+                </div>
+                
+                <div style="display: flex; gap: 1rem;">
+                    <button type="button" 
+                            onclick="testEmailSettings()"
+                            class="btn-info" 
+                            style="padding: 0.75rem 2rem; border: none; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
+                        <i class="fas fa-paper-plane"></i> Test Email
+                    </button>
+                    
+                    <button type="submit" 
+                            class="btn-primary" 
+                            style="padding: 0.75rem 2rem; border: none; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-save"></i> Save Settings
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div style="margin-top: 2rem; max-width: 800px; margin-left: auto; margin-right: auto;">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}" style="padding: 1rem; border-radius: 8px; 
+                         {% if category == 'error' %}background: #fee; color: #c33; border: 1px solid #fcc;
+                         {% else %}background: #e7f5e7; color: #2d6a2d; border: 1px solid #c3e6c3;{% endif %}">
+                        <i class="fas {% if category == 'error' %}fa-exclamation-circle{% else %}fa-check-circle{% endif %}"></i>
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+</div>
+
+<style>
+    .form-control:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        outline: none;
+    }
+    
+    .btn-primary:hover, .btn-secondary:hover, .btn-info:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    }
+    
+    .btn-secondary {
+        background: #f5f5f5;
+        color: #333;
+    }
+    
+    .btn-secondary:hover {
+        background: #e0e0e0;
+    }
+    
+    label {
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+    
+    .form-text {
+        color: #666;
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+    }
+    
+    @media (max-width: 768px) {
+        div[style*="grid-template-columns: 1fr 1fr"] {
+            grid-template-columns: 1fr !important;
+        }
+    }
+    
+    input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+    }
+</style>
+
+<script>
+    function testEmailSettings() {
+        // Get current form values
+        const mailServer = document.getElementById('mail_server').value;
+        const mailPort = document.getElementById('mail_port').value;
+        const mailUsername = document.getElementById('mail_username').value;
+        const mailPassword = document.getElementById('mail_password').value;
+        
+        if (!mailUsername || !mailPassword) {
+            alert('Please fill in email username and password before testing');
+            return;
+        }
+        
+        if (confirm('This will send a test email to verify your settings. Continue?')) {
+            // You can implement a test email endpoint here
+            alert('Test email functionality can be implemented as needed');
+        }
+    }
+    
+    // Form validation
+    document.querySelector('form').addEventListener('submit', function(e) {
+        const mailUsername = document.getElementById('mail_username').value.trim();
+        const mailPassword = document.getElementById('mail_password').value.trim();
+        const mailPort = parseInt(document.getElementById('mail_port').value);
+        
+        if (!mailUsername || !mailPassword) {
+            alert('Email username and password are required');
+            e.preventDefault();
+            return;
+        }
+        
+        if (mailPort < 1 || mailPort > 65535) {
+            alert('Port number must be between 1 and 65535');
+            e.preventDefault();
+            return;
+        }
+        
+        // Email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(mailUsername)) {
+            alert('Please enter a valid email address');
+            e.preventDefault();
+            return;
+        }
+    });
+    
+    // Show/hide password
+    function togglePassword() {
+        const passwordField = document.getElementById('mail_password');
+        const toggleBtn = event.target;
+        
+        if (passwordField.type === 'password') {
+            passwordField.type = 'text';
+            toggleBtn.innerHTML = '<i class="fas fa-eye-slash"></i>';
+        } else {
+            passwordField.type = 'password';
+            toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
+        }
+    }
+    
+    // Add toggle button to password field
+    document.addEventListener('DOMContentLoaded', function() {
+        const passwordField = document.getElementById('mail_password');
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
+        toggleBtn.style.cssText = 'position: absolute; right: 10px; top: 50%; transform: translateY(-50%); border: none; background: none; cursor: pointer; color: #666;';
+        toggleBtn.onclick = togglePassword;
+        
+        passwordField.parentNode.style.position = 'relative';
+        passwordField.style.paddingRight = '40px';
+        passwordField.parentNode.appendChild(toggleBtn);
+    });
+</script>
+{% endblock %}
