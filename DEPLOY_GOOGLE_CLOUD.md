@@ -79,6 +79,12 @@ gcloud run deploy online-exam \
 
 ## Database Setup (Production)
 
+### ⚠️ Important Note for Cloud Run
+The application now **automatically initializes** the database on startup. For Cloud Run deployments:
+- SQLite databases are ephemeral (reset on container restart)
+- For persistent data, use Cloud SQL (recommended for production)
+- Default admin users are created automatically: `admin/admin123` and `admin2/admin456`
+
 ### Option A: Use Cloud SQL (Recommended for production)
 
 1. **Create Cloud SQL instance:**

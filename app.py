@@ -10,7 +10,19 @@ import string
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///exam_system.db'
+
+# Database configuration - Cloud SQL or SQLite
+if os.environ.get('GAE_ENV', '').startswith('standard'):
+    # Production App Engine with Cloud SQL
+    db_url = os.environ.get('DATABASE_URL')
+    if db_url:
+        app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+    else:
+        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///exam_system.db'
+else:
+    # Development or Cloud Run with SQLite
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///exam_system.db')
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
@@ -839,6 +851,46 @@ def init_db():
             db.session.commit()
             return jsonify({'message': f'Database initialized. Admin users created: {", ".join(created_users)}'}), 200
         return jsonify({'message': 'Database already initialized'}), 200
+
+def initialize_database():
+    """Initialize database tables and create default admin users"""
+    try:
+        with app.app_context():
+            # Create all tables
+            db.create_all()
+            print("Database tables created successfully")
+            
+            # Create default admin users if they don't exist
+            admin = User.query.filter_by(username='admin').first()
+            if not admin:
+                admin = User(
+                    username='admin',
+                    email='admin@examapp.com',
+                    password_hash=generate_password_hash('admin123'),
+                    is_admin=True
+                )
+                db.session.add(admin)
+                print("Created default admin user: admin/admin123")
+            
+            admin2 = User.query.filter_by(username='admin2').first()
+            if not admin2:
+                admin2 = User(
+                    username='admin2',
+                    email='admin2@examapp.com',
+                    password_hash=generate_password_hash('admin456'),
+                    is_admin=True
+                )
+                db.session.add(admin2)
+                print("Created default admin user: admin2/admin456")
+            
+            db.session.commit()
+            print("Database initialization completed successfully")
+            
+    except Exception as e:
+        print(f"Error initializing database: {e}")
+
+# Initialize database on startup
+initialize_database()
 
 if __name__ == '__main__':
     app.run(debug=True, port=5003)
