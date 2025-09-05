@@ -34,6 +34,24 @@ class FirebaseDB:
                     cred_dict = json.loads(os.getenv('FIREBASE_SERVICE_ACCOUNT'))
                     cred = credentials.Certificate(cred_dict)
                     firebase_admin.initialize_app(cred)
+                elif os.getenv('GOOGLE_CLOUD_PROJECT'):
+                    # Running on Google Cloud - try Secret Manager first
+                    try:
+                        from google.cloud import secretmanager
+                        client = secretmanager.SecretManagerServiceClient()
+                        project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
+                        secret_name = f"projects/{project_id}/secrets/firebase-service-account/versions/latest"
+                        response = client.access_secret_version(request={"name": secret_name})
+                        secret_data = response.payload.data.decode("UTF-8")
+                        cred_dict = json.loads(secret_data)
+                        cred = credentials.Certificate(cred_dict)
+                        firebase_admin.initialize_app(cred)
+                        logger.info("Firebase initialized using Secret Manager")
+                    except Exception as secret_error:
+                        logger.warning(f"Secret Manager failed: {secret_error}, falling back to default credentials")
+                        # Use default credentials (works on Google Cloud)
+                        firebase_admin.initialize_app()
+                        logger.info("Firebase initialized using default credentials")
                 else:
                     # For development, use service account file
                     service_account_path = 'onlineexam-f01cd-firebase-adminsdk-fbsvc-41ab6e69cf.json'
