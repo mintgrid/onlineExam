@@ -20,6 +20,7 @@ google-cloud-firestore==2.13.1
 # Google Cloud dependencies
 google-cloud-storage==2.10.0
 google-cloud-logging==3.8.0
+google-cloud-secret-manager==2.16.4
 
 # Monitoring and performance
 requests==2.31.0

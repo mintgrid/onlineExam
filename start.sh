@@ -9,9 +9,22 @@ echo "Port: ${PORT:-8080}"
 mkdir -p instance
 
 # Start the application
-if [ "${ENVIRONMENT}" = "production" ]; then
+if [ "${ENVIRONMENT}" = "production" ] || [ "${GAE_ENV}" = "standard" ] || [ -n "${K_SERVICE}" ]; then
     echo "Starting with Gunicorn for production..."
-    exec gunicorn --bind :${PORT:-8080} --workers 2 --threads 8 --timeout 0 app:app
+    # Optimized for Cloud Run with faster startup
+    exec gunicorn \
+        --bind :${PORT:-8080} \
+        --workers 1 \
+        --threads 4 \
+        --timeout 120 \
+        --keep-alive 2 \
+        --max-requests 1000 \
+        --max-requests-jitter 100 \
+        --preload \
+        --access-logfile - \
+        --error-logfile - \
+        --log-level info \
+        main:app
 else
     echo "Starting Flask development server..."
     exec python app.py

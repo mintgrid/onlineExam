@@ -152,18 +152,47 @@ def initialize_database():
         
     except Exception as e:
         print(f"Error initializing database: {e}")
+        raise e
+
+# Global flag to track lazy initialization
+_database_initialized = False
+
+def ensure_database_initialized():
+    """Lazy database initialization for faster startup"""
+    global _database_initialized
+    if not _database_initialized:
+        try:
+            initialize_database()
+            _database_initialized = True
+        except Exception as e:
+            print(f"Database initialization failed: {e}")
+            # Don't raise exception to allow app to continue starting
 
 # Routes
 @app.route('/')
 def index():
+    # Lazy initialization on first route access
+    ensure_database_initialized()
     return render_template('index.html')
+
+@app.route('/startup')
+def startup_check():
+    """Quick startup check endpoint for Cloud Run"""
+    return jsonify({
+        'status': 'ready',
+        'message': 'Application started successfully',
+        'timestamp': datetime.now(timezone.utc).isoformat()
+    }), 200
 
 @app.route('/health')
 def health_check():
     """Health check endpoint for Google Cloud monitoring"""
+    # Ensure database is initialized on first health check
+    ensure_database_initialized()
+    
     try:
         # Check Firebase connectivity by getting a user
-        users = firebase_db.get_documents(COLLECTIONS['USERS'], limit=1)
+        firebase_db.get_documents(COLLECTIONS['USERS'], limit=1)
         db_status = 'healthy'
     except Exception as e:
         db_status = f'unhealthy: {str(e)}'
@@ -791,6 +820,15 @@ def edit_assignment(assignment_id):
     return render_template('edit_assignment.html', assignment=assignment)
 
 if __name__ == '__main__':
-    # Initialize Firebase database on startup
-    initialize_database()
-    app.run(debug=True, port=5003)
+    # Get port from environment variable (Cloud Run uses PORT env var)
+    port = int(os.environ.get('PORT', 8080))
+    
+    # Use lazy initialization to speed up startup
+    print("Starting application... (Firebase will initialize on first request)")
+    
+    # Optionally initialize database now (uncomment for immediate init)
+    # ensure_database_initialized()
+    
+    # Use production settings for Cloud Run
+    debug_mode = os.environ.get('FLASK_ENV') == 'development'
+    app.run(host='0.0.0.0', port=port, debug=debug_mode)
