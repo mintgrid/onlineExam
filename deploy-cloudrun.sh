@@ -63,6 +63,9 @@ case $choice in
             --memory 1Gi \
             --cpu 1 \
             --max-instances 10 \
+            --timeout 300 \
+            --concurrency 100 \
+            --set-env-vars "ENVIRONMENT=production" \
             --set-env-vars "FIREBASE_SERVICE_ACCOUNT=$FIREBASE_KEY" \
             --set-env-vars "SECRET_KEY=$(openssl rand -base64 32)" \
             --set-env-vars "MAIL_SERVER=smtp.gmail.com" \
@@ -105,6 +108,9 @@ case $choice in
             --memory 1Gi \
             --cpu 1 \
             --max-instances 10 \
+            --timeout 300 \
+            --concurrency 100 \
+            --set-env-vars "ENVIRONMENT=production" \
             --set-env-vars "SECRET_KEY=$(openssl rand -base64 32)" \
             --set-env-vars "MAIL_SERVER=smtp.gmail.com" \
             --set-env-vars "MAIL_PORT=587" \
@@ -149,6 +155,9 @@ case $choice in
             --memory 1Gi \
             --cpu 1 \
             --max-instances 10 \
+            --timeout 300 \
+            --concurrency 100 \
+            --set-env-vars "ENVIRONMENT=production" \
             --set-env-vars "GOOGLE_CLOUD_PROJECT=$PROJECT_ID" \
             --set-env-vars "SECRET_KEY=$(openssl rand -base64 32)" \
             --set-env-vars "MAIL_SERVER=smtp.gmail.com" \
