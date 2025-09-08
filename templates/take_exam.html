@@ -81,8 +81,17 @@
 </div>
 
 <script>
-    let timeRemaining = {{ time_remaining }};
+    let timeRemaining = {{ time_remaining if time_remaining is defined else (exam.duration_minutes * 60) }};
     const timerElement = document.getElementById('timer');
+    
+    console.log('Initial time remaining:', timeRemaining, 'seconds');
+    console.log('Exam duration:', {{ exam.duration_minutes }}, 'minutes');
+    
+    // Fallback if timeRemaining is not a valid number
+    if (isNaN(timeRemaining) || timeRemaining < 0) {
+        console.warn('Invalid time remaining, using exam duration as fallback');
+        timeRemaining = {{ exam.duration_minutes * 60 }}; // Use actual exam duration
+    }
     
     function updateTimer() {
         if (timeRemaining <= 0) {
@@ -117,8 +126,10 @@
         }
     }
     
-    setInterval(updateTimer, 1000);
+    // Start the timer immediately
     updateTimer();
+    // Then update every second
+    setInterval(updateTimer, 1000);
     
     window.addEventListener('beforeunload', function (e) {
         e.preventDefault();
