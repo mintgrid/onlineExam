@@ -26,55 +26,109 @@ class FirebaseDB:
         self._initialize_firebase()
     
     def _initialize_firebase(self):
-        """Initialize Firebase Admin SDK"""
+        """Initialize Firebase Admin SDK with comprehensive error handling"""
         try:
-            if not firebase_admin._apps:
-                # For production, use service account key
-                if os.getenv('FIREBASE_SERVICE_ACCOUNT'):
-                    cred_dict = json.loads(os.getenv('FIREBASE_SERVICE_ACCOUNT'))
+            # Reset any existing apps for reinitialization
+            if firebase_admin._apps:
+                logger.info("Firebase apps already exist, using existing initialization")
+                self.db = firestore.client()
+                return
+                
+            logger.info("Initializing Firebase Admin SDK...")
+            
+            # Method 1: Environment variable (for Cloud Run)
+            if os.getenv('FIREBASE_SERVICE_ACCOUNT'):
+                logger.info("Using FIREBASE_SERVICE_ACCOUNT environment variable")
+                try:
+                    service_account_json = os.getenv('FIREBASE_SERVICE_ACCOUNT')
+                    # Validate JSON format
+                    cred_dict = json.loads(service_account_json)
+                    
+                    # Validate required fields
+                    required_fields = ['type', 'project_id', 'private_key_id', 'private_key', 'client_email']
+                    for field in required_fields:
+                        if field not in cred_dict:
+                            raise ValueError(f"Missing required field: {field}")
+                    
                     cred = credentials.Certificate(cred_dict)
                     firebase_admin.initialize_app(cred)
-                elif os.getenv('GOOGLE_CLOUD_PROJECT'):
-                    # Running on Google Cloud - try Secret Manager first
+                    logger.info(f"Firebase initialized with service account for project: {cred_dict.get('project_id')}")
+                    
+                except json.JSONDecodeError as e:
+                    logger.error(f"Invalid JSON in FIREBASE_SERVICE_ACCOUNT: {e}")
+                    raise ValueError("FIREBASE_SERVICE_ACCOUNT contains invalid JSON")
+                except ValueError as e:
+                    logger.error(f"Invalid service account format: {e}")
+                    raise
+                    
+            # Method 2: Google Cloud Secret Manager
+            elif os.getenv('GOOGLE_CLOUD_PROJECT'):
+                logger.info("Attempting Secret Manager authentication")
+                project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
+                try:
+                    from google.cloud import secretmanager
+                    client = secretmanager.SecretManagerServiceClient()
+                    secret_name = f"projects/{project_id}/secrets/firebase-service-account/versions/latest"
+                    response = client.access_secret_version(request={"name": secret_name})
+                    secret_data = response.payload.data.decode("UTF-8")
+                    cred_dict = json.loads(secret_data)
+                    cred = credentials.Certificate(cred_dict)
+                    firebase_admin.initialize_app(cred)
+                    logger.info("Firebase initialized using Secret Manager")
+                except Exception as secret_error:
+                    logger.warning(f"Secret Manager failed: {secret_error}")
+                    logger.info("Falling back to default Google Cloud credentials")
                     try:
-                        from google.cloud import secretmanager
-                        client = secretmanager.SecretManagerServiceClient()
-                        project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
-                        secret_name = f"projects/{project_id}/secrets/firebase-service-account/versions/latest"
-                        response = client.access_secret_version(request={"name": secret_name})
-                        secret_data = response.payload.data.decode("UTF-8")
-                        cred_dict = json.loads(secret_data)
-                        cred = credentials.Certificate(cred_dict)
-                        firebase_admin.initialize_app(cred)
-                        logger.info("Firebase initialized using Secret Manager")
-                    except Exception as secret_error:
-                        logger.warning(f"Secret Manager failed: {secret_error}, falling back to default credentials")
-                        # Use default credentials (works on Google Cloud)
                         firebase_admin.initialize_app()
                         logger.info("Firebase initialized using default credentials")
-                else:
-                    # For development, use service account file
-                    service_account_path = 'onlineexam-f01cd-firebase-adminsdk-fbsvc-41ab6e69cf.json'
-                    if os.path.exists(service_account_path):
-                        cred = credentials.Certificate(service_account_path)
-                        firebase_admin.initialize_app(cred)
-                    else:
-                        # Fallback to firebase-service-account.json
-                        fallback_path = 'firebase-service-account.json'
-                        if os.path.exists(fallback_path):
-                            cred = credentials.Certificate(fallback_path)
-                            firebase_admin.initialize_app(cred)
-                        else:
-                            # Use default credentials (works on Google Cloud)
-                            firebase_admin.initialize_app()
+                    except Exception as default_error:
+                        logger.error(f"Default credentials also failed: {default_error}")
+                        raise
+                        
+            # Method 3: Local development files
+            else:
+                logger.info("Checking for local service account files")
+                service_account_files = [
+                    'onlineexam-f01cd-firebase-adminsdk-fbsvc-41ab6e69cf.json',
+                    'firebase-service-account.json'
+                ]
                 
-                logger.info("Firebase initialized successfully")
+                initialized = False
+                for file_path in service_account_files:
+                    if os.path.exists(file_path):
+                        logger.info(f"Using local service account file: {file_path}")
+                        cred = credentials.Certificate(file_path)
+                        firebase_admin.initialize_app(cred)
+                        initialized = True
+                        break
+                
+                if not initialized:
+                    logger.info("No local files found, trying default credentials")
+                    firebase_admin.initialize_app()
             
+            # Initialize Firestore client
             self.db = firestore.client()
             
+            # Test the connection
+            logger.info("Testing Firebase connection...")
+            test_collection = self.db.collection('test')
+            # This will fail if permissions are wrong
+            logger.info("Firebase connection test successful")
+            
         except Exception as e:
-            logger.error(f"Firebase initialization error: {e}")
+            logger.error(f"Firebase initialization failed: {e}")
+            logger.error(f"Error type: {type(e).__name__}")
             self.db = None
+            
+            # Provide helpful error messages
+            if "Permission denied" in str(e):
+                logger.error("Firebase permissions error - check service account roles")
+            elif "not found" in str(e):
+                logger.error("Firebase project not found - check project ID")
+            elif "Invalid argument" in str(e):
+                logger.error("Invalid service account credentials")
+                
+            raise RuntimeError(f"Firebase initialization failed: {e}")
     
     def _get_cache_key(self, collection_name, filters=None, order_by=None, limit=None):
         """Generate cache key for query"""
@@ -219,6 +273,18 @@ class FirebaseDB:
     
     def get_document_by_field(self, collection_name, field, value):
         """Get a document by a specific field value"""
+        # Check if database is properly initialized
+        if self.db is None:
+            logger.error("Firebase database not initialized. Attempting to reinitialize...")
+            try:
+                self._initialize_firebase()
+                if self.db is None:
+                    logger.error("Firebase reinitialization failed")
+                    return None
+            except Exception as init_error:
+                logger.error(f"Firebase reinitialization error: {init_error}")
+                return None
+        
         try:
             docs = self.db.collection(collection_name).where(filter=gcp_firestore.FieldFilter(field, '==', value)).limit(1).stream()
             
@@ -231,6 +297,13 @@ class FirebaseDB:
             
         except Exception as e:
             logger.error(f"Error getting document by {field} from {collection_name}: {e}")
+            # If it's a connection error, try to reinitialize
+            if "NoneType" in str(e) or "not initialized" in str(e):
+                logger.info("Attempting Firebase reinitialization due to connection error")
+                try:
+                    self._initialize_firebase()
+                except Exception as init_error:
+                    logger.error(f"Reinitialization failed: {init_error}")
             return None
     
     def batch_write(self, operations):

@@ -14,6 +14,7 @@ import json
 # Import Firebase models and configuration
 from firebase_models import User, Exam, Question, ExamPermission, ExamResult, Settings, get_setting, set_setting, generate_password
 from firebase_config import firebase_db, COLLECTIONS
+import firebase_admin
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -184,6 +185,36 @@ def startup_check():
         'timestamp': datetime.now(timezone.utc).isoformat()
     }), 200
 
+@app.route('/debug')
+def debug_firebase():
+    """Firebase diagnostic endpoint for Cloud Run debugging"""
+    debug_info = {
+        'timestamp': datetime.now(timezone.utc).isoformat(),
+        'environment': {
+            'K_SERVICE': os.environ.get('K_SERVICE'),  # Cloud Run service name
+            'PORT': os.environ.get('PORT'),
+            'GOOGLE_CLOUD_PROJECT': os.environ.get('GOOGLE_CLOUD_PROJECT'),
+            'FIREBASE_SERVICE_ACCOUNT_SET': bool(os.environ.get('FIREBASE_SERVICE_ACCOUNT')),
+        },
+        'firebase': {
+            'admin_apps': len(firebase_admin._apps) if 'firebase_admin' in globals() else 0,
+            'db_initialized': firebase_db.db is not None,
+        }
+    }
+    
+    # Test Firebase connection
+    try:
+        if firebase_db.db:
+            # Quick test query
+            firebase_db.get_documents(COLLECTIONS['USERS'], limit=1)
+            debug_info['firebase']['connection_test'] = 'success'
+        else:
+            debug_info['firebase']['connection_test'] = 'db_not_initialized'
+    except Exception as e:
+        debug_info['firebase']['connection_test'] = f'failed: {str(e)}'
+    
+    return jsonify(debug_info), 200
+
 @app.route('/health')
 def health_check():
     """Health check endpoint for Google Cloud monitoring"""
@@ -336,10 +367,33 @@ def create_exam():
         return redirect(url_for('index'))
     
     if request.method == 'POST':
+        # Validate required fields
+        title = request.form.get('title')
+        description = request.form.get('description', '')
+        # Check for both 'duration' and 'duration_minutes' field names for compatibility
+        duration_str = request.form.get('duration') or request.form.get('duration_minutes')
+        
+        if not title:
+            flash('Exam title is required', 'error')
+            return redirect(url_for('create_exam'))
+        
+        if not duration_str:
+            flash('Exam duration is required', 'error')
+            return redirect(url_for('create_exam'))
+        
+        try:
+            duration_minutes = int(duration_str)
+            if duration_minutes < 5 or duration_minutes > 300:
+                flash('Duration must be between 5 and 300 minutes', 'error')
+                return redirect(url_for('create_exam'))
+        except (ValueError, TypeError):
+            flash('Invalid duration value', 'error')
+            return redirect(url_for('create_exam'))
+        
         exam = Exam()
-        exam.title = request.form.get('title')
-        exam.description = request.form.get('description')
-        exam.duration_minutes = int(request.form.get('duration_minutes'))
+        exam.title = title
+        exam.description = description
+        exam.duration_minutes = duration_minutes
         exam.created_by = current_user.id
         
         exam_id = exam.save()
@@ -398,9 +452,32 @@ def edit_exam(exam_id):
         return redirect(url_for('admin_dashboard'))
     
     if request.method == 'POST':
-        exam.title = request.form.get('title')
-        exam.description = request.form.get('description')
-        exam.duration_minutes = int(request.form.get('duration_minutes'))
+        # Validate required fields
+        title = request.form.get('title')
+        description = request.form.get('description', '')
+        # Check for both 'duration' and 'duration_minutes' field names for compatibility
+        duration_str = request.form.get('duration') or request.form.get('duration_minutes')
+        
+        if not title:
+            flash('Exam title is required', 'error')
+            return redirect(url_for('edit_exam', exam_id=exam_id))
+        
+        if not duration_str:
+            flash('Exam duration is required', 'error')
+            return redirect(url_for('edit_exam', exam_id=exam_id))
+        
+        try:
+            duration_minutes = int(duration_str)
+            if duration_minutes < 5 or duration_minutes > 300:
+                flash('Duration must be between 5 and 300 minutes', 'error')
+                return redirect(url_for('edit_exam', exam_id=exam_id))
+        except (ValueError, TypeError):
+            flash('Invalid duration value', 'error')
+            return redirect(url_for('edit_exam', exam_id=exam_id))
+        
+        exam.title = title
+        exam.description = description
+        exam.duration_minutes = duration_minutes
         
         if exam.save():
             flash('Exam updated successfully', 'success')
@@ -634,9 +711,13 @@ def user_dashboard():
     for permission in permissions:
         exam = Exam.get_by_id(permission.exam_id)
         if exam:
+            # Load questions for this exam to get accurate question count
+            exam.questions = Question.get_by_exam_id(exam.id)
             permission.exam = exam
             
             if permission.is_completed:
+                # Also load exam results for completed exams
+                exam.results = ExamResult.get_by_exam_id(exam.id)
                 completed_exams.append(permission)
             elif permission.start_time <= current_time <= permission.end_time:
                 available_exams.append(permission)
@@ -670,7 +751,22 @@ def take_exam(exam_id):
     exam = Exam.get_by_id(exam_id)
     questions = Question.get_by_exam_id(exam_id)
     
-    return render_template('take_exam.html', exam=exam, questions=questions, permission=permission)
+    # Calculate time remaining for the exam
+    # For the exam timer, we use the full exam duration regardless of permission window
+    # This gives students the full allocated time for the exam
+    time_remaining_seconds = exam.duration_minutes * 60
+    
+    # However, we should also check if the permission window ends before the exam duration
+    # to prevent students from taking more time than the permission allows
+    time_until_permission_end = int((permission.end_time - current_time).total_seconds())
+    
+    # Use the minimum of exam duration and time until permission ends
+    time_remaining = min(time_remaining_seconds, time_until_permission_end)
+    
+    # Ensure time remaining is not negative
+    time_remaining = max(0, time_remaining)
+    
+    return render_template('take_exam.html', exam=exam, questions=questions, permission=permission, time_remaining=time_remaining)
 
 @app.route('/exam/<exam_id>/submit', methods=['POST'])
 @login_required
@@ -818,6 +914,48 @@ def edit_assignment(assignment_id):
             return redirect(url_for('edit_assignment', assignment_id=assignment_id))
     
     return render_template('edit_assignment.html', assignment=assignment)
+
+@app.route('/admin/user/<user_id>/delete', methods=['POST'])
+@login_required
+def delete_user(user_id):
+    if not current_user.is_admin:
+        return jsonify({'error': 'Access denied'}), 403
+    
+    # Get the user to delete
+    user = User.get_by_id(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    
+    # Prevent deletion of admin users (safety measure)
+    if user.is_admin:
+        return jsonify({'error': 'Cannot delete admin users'}), 403
+    
+    # Prevent deletion of current user
+    if user.id == current_user.id:
+        return jsonify({'error': 'Cannot delete your own account'}), 403
+    
+    try:
+        # Delete related data first (cascade deletion)
+        
+        # 1. Delete exam results for this user
+        exam_results = ExamResult.get_by_user_id(user_id)
+        for result in exam_results:
+            result.delete()
+        
+        # 2. Delete exam permissions (assignments) for this user
+        permissions = ExamPermission.get_by_user_id(user_id)
+        for permission in permissions:
+            permission.delete()
+        
+        # 3. Finally delete the user
+        if user.delete():
+            return jsonify({'message': f'User {user.username} deleted successfully'}), 200
+        else:
+            return jsonify({'error': 'Error deleting user from database'}), 500
+            
+    except Exception as e:
+        print(f"Error deleting user {user_id}: {str(e)}")
+        return jsonify({'error': f'Error deleting user: {str(e)}'}), 500
 
 if __name__ == '__main__':
     # Get port from environment variable (Cloud Run uses PORT env var)
